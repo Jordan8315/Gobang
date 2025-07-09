@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>单机五子棋游戏</title>
+    <link rel="shortcut icon" href="https://114514.store/icon.ico" type="image/x-icon">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css" rel="stylesheet">
+    <script src="gobang.js"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#8B5A2B',
+                        secondary: '#D2B48C',
+                        board: '#DEB887',
+                        black: '#000000',
+                        white: '#FFFFFF',
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                    },
+                }
+            }
+        }
+    </script>
+    <style type="text/tailwindcss">
+        @layer utilities {
+            .content-auto {
+                content-visibility: auto;
+            }
+            .board-grid {
+                background-size: 100% 100%;
+                background-image: linear-gradient(to right, rgba(0,0,0,0.6) 1px, transparent 1px),
+                                  linear-gradient(to bottom, rgba(0,0,0,0.6) 1px, transparent 1px);
+            }
+            .piece-shadow {
+                filter: drop-shadow(0 4px 3px rgb(0 0 0 / 0.07)) drop-shadow(0 2px 2px rgb(0 0 0 / 0.06));
+            }
+            .piece-transition {
+                transition: all 0.2s ease-out;
+            }
+            .btn-hover {
+                transition: all 0.2s ease;
+            }
+            .btn-hover:hover {
+                transform: translateY(-2px);
+                box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            }
+            .overlay-blur {
+                backdrop-filter: blur(4px);
+            }
+        }
+    </style>
+</head>
+
+<body class="bg-gray-100 min-h-screen flex flex-col items-center justify-center p-4 font-sans">
+    <div class="max-w-4xl w-full bg-white rounded-2xl shadow-xl overflow-hidden">
+        <div class="bg-primary text-white p-6 text-center">
+            <h1 class="text-[clamp(1.5rem,3vw,2.5rem)] font-bold">五子棋</h1>
+            <p class="text-secondary mt-2">经典对弈游戏</p>
+        </div>
+
+        <div class="p-6 md:p-8 flex flex-col md:flex-row gap-6">
+            <!-- 游戏区域 -->
+            <div class="flex-1 relative">
+                <div class="aspect-square bg-board rounded-lg shadow-lg overflow-hidden board-grid"
+                    style="background-size: calc(100% / 14) calc(100% / 14);">
+                    <canvas id="gameCanvas" class="w-full h-full cursor-pointer"></canvas>
+                </div>
+
+                <div id="gameStatus" class="mt-4 p-3 bg-secondary/20 rounded-lg text-center">
+                    <p id="statusText" class="font-medium">游戏开始! 黑棋先行</p>
+                </div>
+            </div>
+
+            <!-- 游戏控制和信息 -->
+            <div class="w-full md:w-80 flex flex-col gap-6">
+                <div class="bg-gray-50 rounded-lg p-5 shadow-sm">
+                    <h2 class="text-lg font-semibold mb-3 flex items-center">
+                        <i class="fa-solid fa-info-circle mr-2 text-primary"></i>游戏信息
+                    </h2>
+                    <div class="space-y-3">
+                        <div class="flex items-center justify-between">
+                            <span class="text-gray-600">当前回合</span>
+                            <div class="flex items-center">
+                                <div id="currentPlayer" class="w-6 h-6 rounded-full bg-black mr-2 piece-shadow"></div>
+                                <span id="playerText">黑棋</span>
+                            </div>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <span class="text-gray-600">游戏时间</span>
+                            <span id="gameTime" class="font-mono">00:00</span>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <span class="text-gray-600">步数</span>
+                            <span id="moveCount">0</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-gray-50 rounded-lg p-5 shadow-sm">
+                    <h2 class="text-lg font-semibold mb-3 flex items-center">
+                        <i class="fa-solid fa-crown mr-2 text-primary"></i>游戏规则
+                    </h2>
+                    <ul class="text-sm text-gray-600 space-y-2">
+                        <li class="flex items-start">
+                            <i class="fa-solid fa-circle text-xs mt-1.5 mr-2 text-primary"></i>
+                            <span>黑棋和白棋轮流在棋盘上落子</span>
+                        </li>
+                        <li class="flex items-start">
+                            <i class="fa-solid fa-circle text-xs mt-1.5 mr-2 text-primary"></i>
+                            <span>先在横、竖或斜方向形成五子连线者获胜</span>
+                        </li>
+                        <li class="flex items-start">
+                            <i class="fa-solid fa-circle text-xs mt-1.5 mr-2 text-primary"></i>
+                            <span>点击棋盘上的交叉点放置棋子</span>
+                        </li>
+                    </ul>
+                </div>
+
+                <div class="flex gap-3">
+                    <button id="restartBtn"
+                        class="flex-1 bg-primary hover:bg-primary/90 text-white py-3 px-4 rounded-lg font-medium btn-hover flex items-center justify-center">
+                        <i class="fa-solid fa-refresh mr-2"></i>重新开始
+                    </button>
+                    <button id="undoBtn"
+                        class="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-700 py-3 px-4 rounded-lg font-medium btn-hover flex items-center justify-center">
+                        <i class="fa-solid fa-undo mr-2"></i>悔棋
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-gray-50 p-4 text-center text-sm text-gray-500">
+            <p>© 2025 五子棋游戏 | 一个简单的 Web 游戏</p>
+        </div>
+    </div>
+
+    <!-- 胜利提示模态框 -->
+    <div id="winModal"
+        class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 hidden opacity-0 transition-opacity duration-300">
+        <div class="bg-white rounded-xl p-8 max-w-md w-full mx-4 transform transition-transform duration-300 scale-95">
+            <div class="text-center">
+                <div class="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <i class="fa-solid fa-trophy text-3xl text-yellow-500"></i>
+                </div>
+                <h2 class="text-2xl font-bold mb-2" id="winnerText">黑棋获胜!</h2>
+                <p class="text-gray-600 mb-6">恭喜您赢得了这场精彩的比赛!</p>
+                <div class="flex gap-3 justify-center">
+                    <button id="newGameBtn"
+                        class="flex-1 bg-primary hover:bg-primary/90 text-white py-3 px-4 rounded-lg font-medium btn-hover">
+                        <i class="fa-solid fa-refresh mr-2"></i>开始新游戏
+                    </button>
+                    <button id="closeModalBtn"
+                        class="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-700 py-3 px-4 rounded-lg font-medium btn-hover">
+                        <i class="fa-solid fa-times mr-2"></i>关闭窗口
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</body>
+
+</html>
